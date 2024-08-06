@@ -1,0 +1,4 @@
+game channel
+jump()
+crouch()
+getEnvironment() -> dino_x, dino_y, bird_x, bird_y, cactus_x
