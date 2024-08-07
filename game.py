@@ -8,6 +8,7 @@ from pygame import *
 __author__ = "Shivam Shekhar"
 
 import game_channel
+import graphing_data
 
 gc = game_channel.Channel([], [], [], 0, False)
 
@@ -248,6 +249,7 @@ class Cactus(pygame.sprite.Sprite):
         self.image = self.images[random.randrange(0, 3)]
         self.movement = [-1 * speed, 0]
         gc.cacti.append(self)
+        graphing_data.addCactus(self.rect.x)
 
     def draw(self):
         screen.blit(self.image, self.rect)
@@ -279,6 +281,7 @@ class Ptera(pygame.sprite.Sprite):
         self.index = 0
         self.counter = 0
         gc.birds.append(self)
+        graphing_data.addBird()
 
     def draw(self):
         screen.blit(self.image, self.rect)
@@ -556,6 +559,7 @@ def gameplay():
             if counter % 700 == 699:
                 new_ground.speed -= 1
                 gamespeed += 1
+                graphing_data.addSpeed(gamespeed)
 
             counter = (counter + 1)
 
@@ -756,6 +760,7 @@ class Game:
                     if self.counter % 700 == 699:
                         self.new_ground.speed -= 1
                         self.gamespeed += 1
+                        graphing_data.addSpeed(self.gamespeed)
 
                     self.counter = (self.counter + 1)
 

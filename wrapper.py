@@ -1,7 +1,7 @@
 import pygame
 import stable_baselines3.common.monitor
 from stable_baselines3.common.vec_env import DummyVecEnv
-
+from datetime import datetime, timedelta
 import game
 import gym_dino
 import random
@@ -9,7 +9,7 @@ import gymnasium as gym
 from stable_baselines3 import PPO
 from gym_dino.envs.dino_env import DinoCheckpointCallback, plot_metrics
 
-seed = 0
+seed = None
 
 random.seed(seed)
 
@@ -68,11 +68,14 @@ def testModel(model_name):
             obs, info2 = env.reset()
 
 
-def runHardCoded():
+def runHardCoded(min_to_run):
 
     world = game.Game()
 
-    while True:
+    start_time = datetime.now()
+    end_time = start_time + timedelta(minutes=min_to_run)
+
+    while datetime.now() < end_time:
 
         data = game.gc.getEnvironment()
 
@@ -94,10 +97,48 @@ def runHardCoded():
 
         world.play()
 
+
+def runTillDeath():
+
+    world = game.Game()
+
+    while not game.gc.hasGameEnded:
+
+        world.play()
+
+
+def runHardCodedTillDeath():
+
+    world = game.Game()
+
+    dist_jump = 92
+
+    while not game.gc.hasGameEnded:
+
+        data = game.gc.getEnvironment()
+
+        bird_distance = data["bird"][0]
+        cactus_distance = data["cactus"][0]
+
+        if cactus_distance < dist_jump:
+            game.simulate_key_press(pygame.K_SPACE)
+            game.simulate_key_release(pygame.K_SPACE)
+
+        if bird_distance < dist_jump:
+            game.simulate_key_press(pygame.K_SPACE)
+            game.simulate_key_release(pygame.K_SPACE)
+
+        if (game.gc.hasGameEnded):
+            game.reset()
+            world = game.Game()
+
+        game.gc.getCactusDistances()
+        world.play()
+
 #trainModel("ppo_dino7")
 #testModel2("checkpoints/dino_model_10240_steps")
 #runHardCoded()
-showData()
+#showData()
 #trainModel("ppo_dino8")
 #createNewModel("ppo_dino8")
 

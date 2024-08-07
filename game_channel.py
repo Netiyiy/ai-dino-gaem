@@ -2,6 +2,7 @@ import time
 import numpy as np
 import math
 import game
+import graphing_data
 
 
 class Channel:
@@ -36,10 +37,24 @@ class Channel:
         print(f"hasGameEnded: {self.hasGameEnded}")
     """
 
+    def getCactusDistances(self):
+
+        if len(self.cacti) >= 2:
+            for i in range(len(self.cacti) - 1):
+                result = abs(self.cacti[i].getX() - self.cacti[i+1].getX())
+                if result < graphing_data.minimum:
+                    graphing_data.minimum = result
+                if result > graphing_data.maximum:
+                    graphing_data.maximum = result
+
+
     def getEnvironment(self):
+
         cacti_dist = []
         birds_dist = []
+
         for cactus in list(self.cacti):
+
             if cactus.getX() < self.dino.getX():
                 self.cacti.remove(cactus)
                 self.successfulJumps += 1
@@ -65,6 +80,7 @@ class Channel:
             "bird": np.array([nearest_bird_dist], dtype=np.int64),
             "cactus": np.array([nearest_cactus_dist], dtype=np.int64)
         }
+
 
     # (!) more direct information for AI to learn makes it quicker to learn
     # learning from location of two items vs distance of avoiding object
