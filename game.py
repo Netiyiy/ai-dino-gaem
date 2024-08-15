@@ -649,7 +649,7 @@ class Game:
         self.HI_rect.top = height * 0.1
         self.HI_rect.left = width * 0.73
 
-    def play(self):
+    def play(self, KEY_SPACE, KEY_DOWN, KEY_UP):
         global high_score
         # if not gameQuit:
 
@@ -666,28 +666,29 @@ class Game:
                     gameOver = True
                     gc.hasGameEnded = gameOver
                 else:
-                    for event in pygame.event.get():
+
+                        """
                         if event.type == pygame.QUIT:
                             gameQuit = True
                             gameOver = True
                             gc.hasGameEnded = gameOver
+                        """
 
-                        if event.type == pygame.KEYDOWN:
-                            if event.key == pygame.K_SPACE:
-                                if self.playerDino.rect.bottom == int(0.98 * height):
-                                    self.playerDino.isJumping = True
-                                    if pygame.mixer.get_init() != None:
-                                        pass
-                                        #jump_sound.play()
-                                    self.playerDino.movement[1] = -1 * self.playerDino.jumpSpeed
+                        if KEY_SPACE:
+                            if self.playerDino.rect.bottom == int(0.98 * height):
+                                self.playerDino.isJumping = True
+                                if pygame.mixer.get_init() != None:
+                                    pass
+                                    #jump_sound.play()
+                                self.playerDino.movement[1] = -1 * self.playerDino.jumpSpeed
 
-                            if event.key == pygame.K_DOWN:
-                                if not (self.playerDino.isJumping and self.playerDino.isDead):
-                                    self.playerDino.isDucking = True
+                        if KEY_DOWN:
+                            if not (self.playerDino.isJumping and self.playerDino.isDead):
+                                self.playerDino.isDucking = True
 
-                        if event.type == pygame.KEYUP:
-                            if event.key == pygame.K_DOWN:
-                                self.playerDino.isDucking = False
+                        if KEY_UP:
+                            self.playerDino.isDucking = False
+
                 for c in self.cacti:
                     c.movement[0] = -1 * self.gamespeed
                     if pygame.sprite.collide_mask(self.playerDino, c):
@@ -753,9 +754,11 @@ class Game:
                         if self.playerDino.score > high_score:
                             high_score = self.playerDino.score
 
+                    """
                     if self.counter % 700 == 699:
                         self.new_ground.speed -= 1
                         self.gamespeed += 1
+                    """
 
                     self.counter = (self.counter + 1)
 

@@ -70,7 +70,7 @@ class DinoEnv(gym.Env):
 
         if self.render_mode == "human":
             # self._render_frame()
-            self.world.play()
+            self.world.play(False, False, False)
 
         return observation, info
 
@@ -83,9 +83,12 @@ class DinoEnv(gym.Env):
 
         penalty = 0
 
+        KEY_SPACE = False
+        KEY_DOWN = False
+        KEY_UP = False
+
         if key == "jump":
-            game.simulate_key_press(pygame.K_SPACE)
-            game.simulate_key_release(pygame.K_SPACE)
+            KEY_SPACE = True
             if doPrint:
                 print("Jumped")
 
@@ -100,16 +103,16 @@ class DinoEnv(gym.Env):
             # penalty += 2
             # print(reasonable)
         elif key == "crouch":
-            game.simulate_key_press(pygame.K_DOWN)
+            KEY_DOWN = True
             if doPrint:
                 print("Crouched")
         elif key == "uncrouch":
-            game.simulate_key_release(pygame.K_DOWN)
+            KEY_UP = True
             if doPrint:
                 print("Uncrouched")
             # penalty += 0.1
         elif key == "nothing":
-            game.simulate_key_release(pygame.K_SPACE)
+            KEY_UP = True
             # penalty += -0.5
             # game.simulate_key_release(pygame.K_DOWN)
             if doPrint:
@@ -129,7 +132,7 @@ class DinoEnv(gym.Env):
 
         if self.render_mode == "human":
             # self._render_frame()
-            self.world.play()
+            self.world.play(KEY_SPACE, KEY_DOWN, KEY_UP)
 
         return observation, reward, terminated, False, info
 

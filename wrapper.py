@@ -9,7 +9,11 @@ import gymnasium as gym
 from stable_baselines3 import PPO
 from gym_dino.envs.dino_env import DinoCheckpointCallback, plot_metrics
 
-seed = 0
+seed = 203853699
+
+# 0
+# 1
+# 203853699
 
 random.seed(seed)
 
@@ -25,7 +29,22 @@ def showData():
 
 
 def createNewModel(model_name):
-    model = PPO("MultiInputPolicy", env, verbose=1, seed=seed)
+
+    # model = PPO("MultiInputPolicy", env, verbose=1, seed=seed)
+
+    model = PPO(
+        policy="MultiInputPolicy",  # or "MultiInputPolicy" if you're using multiple input types
+        env=env,
+        verbose=1,
+        seed=seed,
+        n_steps=32,
+        batch_size=256,
+        gae_lambda=0.8,
+        gamma=0.98,
+        n_epochs=20,
+        ent_coef=0.0,
+    )
+
     model.set_random_seed(seed)
     model.save(model_name)
 
@@ -34,7 +53,6 @@ def trainModel(model_name):
     i = 0
 
     model = PPO.load(model_name, env)
-    model.ent_coef = 0.01
 
     while True:
         print(f"<< run {i} >>")
@@ -49,7 +67,6 @@ def trainModel(model_name):
 
 
 def testModel2(model_name):
-
     model = PPO.load(model_name, env)
 
     model.learn(total_timesteps=10_000, callback=checkpoint_callback)
@@ -69,7 +86,6 @@ def testModel(model_name):
 
 
 def runHardCoded():
-
     world = game.Game()
 
     while True:
@@ -91,15 +107,24 @@ def runHardCoded():
             game.reset()
             world = game.Game()
 
+        world.play(False, False, False)
 
-        world.play()
 
-#trainModel("ppo_dino7")
-#testModel2("checkpoints/dino_model_10240_steps")
-#runHardCoded()
+# trainModel("ppo_dino7")
+# testModel2("checkpoints/dino_model_10240_steps")
+# runHardCoded()
+# trainModel("ppo_dino9")
+# trainModel("ppo_dino9")
+# trainModel("ppo_dino10")
+# print(gym.__version__)
+# print(pygame.__version__)
+# testModel2("ppo_dino10")
+# runHardCoded()
+# gym.register('DinoEnv-v0', 'gym_dino.envs:DinoEnv')
+
+#trainModel("ppo_dino11")
+
 showData()
-#trainModel("ppo_dino8")
-#createNewModel("ppo_dino8")
 
 env.close()
 
@@ -124,3 +149,7 @@ env.close()
 
 # how good performance
 # diff factors performance
+
+
+# vectorize environment
+# optimize values
