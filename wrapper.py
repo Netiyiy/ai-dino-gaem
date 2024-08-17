@@ -7,9 +7,10 @@ import gym_dino
 import random
 import gymnasium as gym
 from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import DummyVecEnv
 from gym_dino.envs.dino_env import DinoCheckpointCallback, plot_metrics
 
-seed = 203853699
+seed = 12343214
 
 # 0
 # 1
@@ -17,7 +18,9 @@ seed = 203853699
 
 random.seed(seed)
 
+
 env = gym.make('DinoEnv-v0', render_mode='human')
+
 
 checkpoint_callback = DinoCheckpointCallback(save_freq=100000, save_path='./checkpoints/', name_prefix='dino_model')
 
@@ -29,7 +32,6 @@ def showData():
 
 
 def createNewModel(model_name):
-
     # model = PPO("MultiInputPolicy", env, verbose=1, seed=seed)
 
     model = PPO(
@@ -42,7 +44,7 @@ def createNewModel(model_name):
         gae_lambda=0.8,
         gamma=0.98,
         n_epochs=20,
-        ent_coef=0.0,
+        ent_coef=0.01,
     )
 
     model.set_random_seed(seed)
@@ -120,11 +122,11 @@ def runHardCoded():
 # print(pygame.__version__)
 # testModel2("ppo_dino10")
 # runHardCoded()
-# gym.register('DinoEnv-v0', 'gym_dino.envs:DinoEnv')
+#gym.register('DinoEnv-v0', 'gym_dino.envs:DinoEnv')
 
-#trainModel("ppo_dino11")
-
-showData()
+#showData()
+#trainModel("ppo_dino12")
+# showData()
 
 env.close()
 
@@ -149,7 +151,6 @@ env.close()
 
 # how good performance
 # diff factors performance
-
 
 # vectorize environment
 # optimize values

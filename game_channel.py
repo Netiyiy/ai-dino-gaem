@@ -6,17 +6,6 @@ import game
 
 class Channel:
 
-    """
-    def __init__(self, dino_x, dino_y, bird_x, bird_y, cactus_x, score, hasGameEnded):
-        self.dino_x = dino_x
-        self.dino_y = dino_y
-        self.bird_x = bird_x
-        self.bird_y = bird_y
-        self.cactus_x = cactus_x
-        self.score = score
-        self.hasGameEnded = False
-    """
-
     def __init__(self, dino, birds, cacti, score, hasGameEnded):
         self.dino = dino
         self.birds = birds
@@ -24,17 +13,6 @@ class Channel:
         self.score = score
         self.hasGameEnded = False
         self.successfulJumps = 0
-
-    """
-    def print(self):
-        print(f"dino_x: {self.dino_x}")
-        print(f"dino_y: {self.dino_y}")
-        print(f"bird_x: {self.bird_x}")
-        print(f"bird_y: {self.bird_y}")
-        print(f"cactus_x: {self.cactus_x}")
-        print(f"score: {self.score}")
-        print(f"hasGameEnded: {self.hasGameEnded}")
-    """
 
     def getEnvironment(self):
         cacti_dist = []

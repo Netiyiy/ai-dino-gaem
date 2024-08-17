@@ -1,47 +1,14 @@
 import os
-import time
-import sys
 import pygame
 import random
+import game_channel
 from pygame import *
+
 
 __author__ = "Shivam Shekhar"
 
-import game_channel
 
-gc = game_channel.Channel([], [], [], 0, False)
-
-def reset():
-    global gc
-    gc = game_channel.Channel(gc.dino, [], [], 0, False)
-
-
-class DinoRush:
-
-    def __init__(self):
-        pygame.mixer.pre_init(44100, -16, 2, 2048)  # fix audio delay
-        pygame.init()
-
-        print(random.randrange(1, 10))
-
-        self.scr_size = (self.width, self.height) = (600, 150)
-        self.FPS = 60
-        self.gravity = 0.6
-
-        self.black = (0, 0, 0)
-        self.white = (255, 255, 255)
-        self.background_col = (235, 235, 235)
-
-        self.high_score = 0
-
-        self.screen = pygame.display.set_mode(scr_size)
-        self.clock = pygame.time.Clock()
-        pygame.display.set_caption("T-Rex Rush")
-
-        self.jump_sound = pygame.mixer.Sound('sprites/jump.wav')
-        self.die_sound = pygame.mixer.Sound('sprites/die.wav')
-        self.checkPoint_sound = pygame.mixer.Sound('sprites/checkPoint.wav')
-
+### VARIABLES ###
 
 pygame.mixer.pre_init(44100, -16, 2, 2048)  # fix audio delay
 pygame.init()
@@ -54,8 +21,6 @@ black = (0, 0, 0)
 white = (255, 255, 255)
 background_col = (235, 235, 235)
 
-high_score = 0
-
 screen = pygame.display.set_mode(scr_size)
 clock = pygame.time.Clock()
 pygame.display.set_caption("T-Rex Rush")
@@ -63,6 +28,370 @@ pygame.display.set_caption("T-Rex Rush")
 jump_sound = pygame.mixer.Sound('sprites/jump.wav')
 die_sound = pygame.mixer.Sound('sprites/die.wav')
 checkPoint_sound = pygame.mixer.Sound('sprites/checkPoint.wav')
+
+
+class Game:
+
+    def __init__(self):
+
+        self.high_score = 0
+        self.gc = game_channel.Channel([], [], [], 0, False)
+        self.currentScore = 0
+        self.gamespeed = 4
+        self.startMenu = False
+        self.gameOver = False
+        self.gc.hasGameEnded = self.gameOver
+        self.gameQuit = False
+        self.playerDino = Dino(self, 44, 47)
+        self.new_ground = Ground(-1 * self.gamespeed)
+        self.scb = Scoreboard()
+        self.highsc = Scoreboard(width * 0.78)
+        self.counter = 0
+
+        self.cacti = pygame.sprite.Group()
+        self.pteras = pygame.sprite.Group()
+        self.clouds = pygame.sprite.Group()
+        self.last_obstacle = pygame.sprite.Group()
+
+        Cactus.containers = self.cacti
+        Ptera.containers = self.pteras
+        Cloud.containers = self.clouds
+
+        #print("Initial")
+
+        self.retbutton_image, self.retbutton_rect = load_image('replay_button.png', 35, 31, -1)
+        self.gameover_image, self.gameover_rect = load_image('game_over.png', 190, 11, -1)
+
+        self.temp_images, self.temp_rect = load_sprite_sheet('numbers.png', 12, 1, 11, int(11 * 6 / 5), -1)
+        self.HI_image = pygame.Surface((22, int(11 * 6 / 5)))
+        self.HI_rect = self.HI_image.get_rect()
+        self.HI_image.fill(background_col)
+        self.HI_image.blit(self.temp_images[10], self.temp_rect)
+        self.temp_rect.left += self.temp_rect.width
+        self.HI_image.blit(self.temp_images[11], self.temp_rect)
+        self.HI_rect.top = height * 0.1
+        self.HI_rect.left = width * 0.73
+
+    def reset(self):
+        #temp = game_channel.Channel(self.gc.dino, [], [], 0, False)
+        self.__init__()
+        #self.gc = temp
+
+    def play(self, KEY_SPACE, KEY_DOWN, KEY_UP):
+
+            if pygame.display.get_surface() == None:
+                print("Couldn't load display surface")
+                gameQuit = True
+                gameOver = True
+                self.gc.hasGameEnded = gameOver
+            else:
+
+                if KEY_SPACE:
+                    if self.playerDino.rect.bottom == int(0.98 * height):
+                        self.playerDino.isJumping = True
+                        if pygame.mixer.get_init() != None:
+                            pass
+                            # jump_sound.play()
+                        self.playerDino.movement[1] = -1 * self.playerDino.jumpSpeed
+
+                if KEY_DOWN:
+                    if not (self.playerDino.isJumping and self.playerDino.isDead):
+                        self.playerDino.isDucking = True
+
+                if KEY_UP:
+                    self.playerDino.isDucking = False
+
+                for c in self.cacti:
+                    c.movement[0] = -1 * self.gamespeed
+                    if pygame.sprite.collide_mask(self.playerDino, c):
+                        self.playerDino.isDead = True
+                        if pygame.mixer.get_init() != None:
+                            pass
+                            # die_sound.play()
+
+                for p in self.pteras:
+                    p.movement[0] = -1 * self.gamespeed
+                    if pygame.sprite.collide_mask(self.playerDino, p):
+                        self.playerDino.isDead = True
+                        if pygame.mixer.get_init() != None:
+                            pass
+                            # die_sound.play()
+
+                if len(self.cacti) < 2:
+                    if len(self.cacti) == 0:
+                        self.last_obstacle.empty()
+                        self.last_obstacle.add(Cactus(self, self.gamespeed, 40, 40))
+                    else:
+                        for l in self.last_obstacle:
+                            if l.rect.right < width * 0.7 and random.randrange(0, 50) == 10:
+                                self.last_obstacle.empty()
+                                self.last_obstacle.add(Cactus(self, self.gamespeed, 40, 40))
+
+                if len(self.pteras) == 0 and random.randrange(0, 200) == 10 and self.counter > 500:
+                    for l in self.last_obstacle:
+                        if l.rect.right < width * 0.8:
+                            self.last_obstacle.empty()
+                            self.last_obstacle.add(Ptera(self, self.gamespeed, 46, 40))
+
+                if len(self.clouds) < 5 and random.randrange(0, 300) == 10:
+                    Cloud(width, random.randrange(height / 5, height / 2))
+
+                self.playerDino.update()
+                self.cacti.update()
+                self.pteras.update()
+                self.clouds.update()
+                self.new_ground.update()
+                self.scb.update(self.playerDino.score)
+                self.highsc.update(self.high_score)
+                self.currentScore = self.playerDino.score
+
+                if pygame.display.get_surface() != None:
+                    screen.fill(background_col)
+                    self.new_ground.draw()
+                    self.clouds.draw(screen)
+                    self.scb.draw()
+                    if self.high_score != 0:
+                        self.highsc.draw()
+                        screen.blit(self.HI_image, self.HI_rect)
+                    self.cacti.draw(screen)
+                    self.pteras.draw(screen)
+                    self.playerDino.draw()
+
+                    pygame.display.update()
+                    clock.tick(FPS)
+
+                    if self.playerDino.isDead:
+                        self.gameOver = True
+                        self.gc.hasGameEnded = self.gameOver
+                        if self.playerDino.score > self.high_score:
+                            self.high_score = self.playerDino.score
+
+                    """
+                    if self.counter % 700 == 699:
+                        self.new_ground.speed -= 1
+                        self.gamespeed += 1
+                    """
+
+                    self.counter = (self.counter + 1)
+
+
+### GAME OBJECTS ###
+
+
+class Dino:
+    def __init__(self, parent, sizex=-1, sizey=-1):
+
+        parent.gc.dino = self
+
+        self.parent = parent
+        self.images, self.rect = load_sprite_sheet('dino.png', 5, 1, sizex, sizey, -1)
+        self.images1, self.rect1 = load_sprite_sheet('dino_ducking.png', 2, 1, 59, sizey, -1)
+        self.rect.bottom = int(0.98 * height)
+        self.rect.left = width / 15
+        self.image = self.images[0]
+        self.index = 0
+        self.counter = 0
+        self.score = 0
+        self.isJumping = False
+        self.isDead = False
+        self.isDucking = False
+        self.isBlinking = False
+        self.movement = [0, 0]
+        self.jumpSpeed = 11.5
+
+        self.stand_pos_width = self.rect.width
+        self.duck_pos_width = self.rect1.width
+
+    def draw(self):
+        screen.blit(self.image, self.rect)
+
+    def checkbounds(self):
+        if self.rect.bottom > int(0.98 * height):
+            self.rect.bottom = int(0.98 * height)
+            self.isJumping = False
+
+    def update(self):
+
+        self.parent.gc.dino_x = self.rect.left
+        self.parent.gc.dino_y = self.rect.top
+
+        if self.isJumping:
+            self.movement[1] = self.movement[1] + gravity
+
+        if self.isJumping:
+            self.index = 0
+        elif self.isBlinking:
+            if self.index == 0:
+                if self.counter % 400 == 399:
+                    self.index = (self.index + 1) % 2
+            else:
+                if self.counter % 20 == 19:
+                    self.index = (self.index + 1) % 2
+
+        elif self.isDucking:
+            if self.counter % 5 == 0:
+                self.index = (self.index + 1) % 2
+        else:
+            if self.counter % 5 == 0:
+                self.index = (self.index + 1) % 2 + 2
+
+        if self.isDead:
+            self.index = 4
+
+        if not self.isDucking:
+            self.image = self.images[self.index]
+            self.rect.width = self.stand_pos_width
+        else:
+            self.image = self.images1[(self.index) % 2]
+            self.rect.width = self.duck_pos_width
+
+        self.rect = self.rect.move(self.movement)
+        self.checkbounds()
+
+        if not self.isDead and self.counter % 7 == 6 and self.isBlinking == False:
+            self.score += 1
+            if self.score % 100 == 0 and self.score != 0:
+                if pygame.mixer.get_init() != None:
+                    # checkPoint_sound.play()
+                    pass
+
+        self.counter = (self.counter + 1)
+
+    def getX(self):
+        return self.rect.x
+
+    def getY(self):
+        return self.rect.y
+
+
+class Cactus(pygame.sprite.Sprite):
+    def __init__(self, parent, speed=5, sizex=-1, sizey=-1):
+        pygame.sprite.Sprite.__init__(self, self.containers)
+        self.parent = parent
+        self.images, self.rect = load_sprite_sheet('cacti-small.png', 3, 1, sizex, sizey, -1)
+        self.rect.bottom = int(0.98 * height)
+        self.rect.left = width + self.rect.width
+        self.image = self.images[random.randrange(0, 3)]
+        self.movement = [-1 * speed, 0]
+        parent.gc.cacti.append(self)
+
+    def draw(self):
+        screen.blit(self.image, self.rect)
+
+    def update(self):
+        self.rect = self.rect.move(self.movement)
+        if self.rect.right < 0:
+            self.kill()
+
+    def getX(self):
+        return self.rect.x
+
+    def getY(self):
+        return self.rect.y
+
+
+class Ptera(pygame.sprite.Sprite):
+    def __init__(self, parent, speed=5, sizex=-1, sizey=-1):
+        pygame.sprite.Sprite.__init__(self, self.containers)
+        self.images, self.rect = load_sprite_sheet('ptera.png', 2, 1, sizex, sizey, -1)
+        self.ptera_height = [height * 0.82, height * 0.75, height * 0.60]
+        self.rect.centery = self.ptera_height[random.randrange(0, 3)]
+        self.rect.left = width + self.rect.width
+        self.image = self.images[0]
+        self.movement = [-1 * speed, 0]
+        self.index = 0
+        self.counter = 0
+        parent.gc.birds.append(self)
+
+    def draw(self):
+        screen.blit(self.image, self.rect)
+
+    def update(self):
+        if self.counter % 10 == 0:
+            self.index = (self.index + 1) % 2
+        self.image = self.images[self.index]
+        self.rect = self.rect.move(self.movement)
+        self.counter = (self.counter + 1)
+        if self.rect.right < 0:
+            self.kill()
+
+    def getX(self):
+        return self.rect.x
+
+    def getY(self):
+        return self.rect.y
+
+
+class Ground:
+    def __init__(self, speed=-5):
+        self.image, self.rect = load_image('ground.png', -1, -1, -1)
+        self.image1, self.rect1 = load_image('ground.png', -1, -1, -1)
+        self.rect.bottom = height
+        self.rect1.bottom = height
+        self.rect1.left = self.rect.right
+        self.speed = speed
+
+    def draw(self):
+        screen.blit(self.image, self.rect)
+        screen.blit(self.image1, self.rect1)
+
+    def update(self):
+        self.rect.left += self.speed
+        self.rect1.left += self.speed
+
+        if self.rect.right < 0:
+            self.rect.left = self.rect1.right
+
+        if self.rect1.right < 0:
+            self.rect1.left = self.rect.right
+
+
+class Cloud(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        pygame.sprite.Sprite.__init__(self, self.containers)
+        self.image, self.rect = load_image('cloud.png', int(90 * 30 / 42), 30, -1)
+        self.speed = 1
+        self.rect.left = x
+        self.rect.top = y
+        self.movement = [-1 * self.speed, 0]
+
+    def draw(self):
+        screen.blit(self.image, self.rect)
+
+    def update(self):
+        self.rect = self.rect.move(self.movement)
+        if self.rect.right < 0:
+            self.kill()
+
+
+class Scoreboard:
+    def __init__(self, x=-1, y=-1):
+        self.score = 0
+        self.tempimages, self.temprect = load_sprite_sheet('numbers.png', 12, 1, 11, int(11 * 6 / 5), -1)
+        self.image = pygame.Surface((55, int(11 * 6 / 5)))
+        self.rect = self.image.get_rect()
+        if x == -1:
+            self.rect.left = width * 0.89
+        else:
+            self.rect.left = x
+        if y == -1:
+            self.rect.top = height * 0.1
+        else:
+            self.rect.top = y
+
+    def draw(self):
+        screen.blit(self.image, self.rect)
+
+    def update(self, score):
+        score_digits = extractDigits(score)
+        self.image.fill(background_col)
+        for s in score_digits:
+            self.image.blit(self.tempimages[s], self.temprect)
+            self.temprect.left += self.temprect.width
+        self.temprect.left = 0
+
+
+### METHODS ###
 
 
 def load_image(
@@ -152,624 +481,3 @@ def extractDigits(number):
             digits.append(0)
         digits.reverse()
         return digits
-
-
-class Dino():
-    def __init__(self, sizex=-1, sizey=-1):
-
-        gc.dino = self
-
-        self.images, self.rect = load_sprite_sheet('dino.png', 5, 1, sizex, sizey, -1)
-        self.images1, self.rect1 = load_sprite_sheet('dino_ducking.png', 2, 1, 59, sizey, -1)
-        self.rect.bottom = int(0.98 * height)
-        self.rect.left = width / 15
-        self.image = self.images[0]
-        self.index = 0
-        self.counter = 0
-        self.score = 0
-        self.isJumping = False
-        self.isDead = False
-        self.isDucking = False
-        self.isBlinking = False
-        self.movement = [0, 0]
-        self.jumpSpeed = 11.5
-
-        self.stand_pos_width = self.rect.width
-        self.duck_pos_width = self.rect1.width
-
-    def draw(self):
-        screen.blit(self.image, self.rect)
-
-    def checkbounds(self):
-        if self.rect.bottom > int(0.98 * height):
-            self.rect.bottom = int(0.98 * height)
-            self.isJumping = False
-
-    def update(self):
-
-        gc.dino_x = self.rect.left
-        gc.dino_y = self.rect.top
-
-        if self.isJumping:
-            self.movement[1] = self.movement[1] + gravity
-
-        if self.isJumping:
-            self.index = 0
-        elif self.isBlinking:
-            if self.index == 0:
-                if self.counter % 400 == 399:
-                    self.index = (self.index + 1) % 2
-            else:
-                if self.counter % 20 == 19:
-                    self.index = (self.index + 1) % 2
-
-        elif self.isDucking:
-            if self.counter % 5 == 0:
-                self.index = (self.index + 1) % 2
-        else:
-            if self.counter % 5 == 0:
-                self.index = (self.index + 1) % 2 + 2
-
-        if self.isDead:
-            self.index = 4
-
-        if not self.isDucking:
-            self.image = self.images[self.index]
-            self.rect.width = self.stand_pos_width
-        else:
-            self.image = self.images1[(self.index) % 2]
-            self.rect.width = self.duck_pos_width
-
-        self.rect = self.rect.move(self.movement)
-        self.checkbounds()
-
-        if not self.isDead and self.counter % 7 == 6 and self.isBlinking == False:
-            self.score += 1
-            if self.score % 100 == 0 and self.score != 0:
-                if pygame.mixer.get_init() != None:
-                    #checkPoint_sound.play()
-                    pass
-
-        self.counter = (self.counter + 1)
-
-    def getX(self):
-        return self.rect.x
-
-    def getY(self):
-        return self.rect.y
-
-
-class Cactus(pygame.sprite.Sprite):
-    def __init__(self, speed=5, sizex=-1, sizey=-1):
-        pygame.sprite.Sprite.__init__(self, self.containers)
-        self.images, self.rect = load_sprite_sheet('cacti-small.png', 3, 1, sizex, sizey, -1)
-        self.rect.bottom = int(0.98 * height)
-        self.rect.left = width + self.rect.width
-        self.image = self.images[random.randrange(0, 3)]
-        self.movement = [-1 * speed, 0]
-        gc.cacti.append(self)
-
-    def draw(self):
-        screen.blit(self.image, self.rect)
-
-    def update(self):
-        self.rect = self.rect.move(self.movement)
-
-        #gc.cacti.append(self)
-        # gc.cactus_x = self.rect.x
-        if self.rect.right < 0:
-            self.kill()
-
-    def getX(self):
-        return self.rect.x
-
-    def getY(self):
-        return self.rect.y
-
-
-class Ptera(pygame.sprite.Sprite):
-    def __init__(self, speed=5, sizex=-1, sizey=-1):
-        pygame.sprite.Sprite.__init__(self, self.containers)
-        self.images, self.rect = load_sprite_sheet('ptera.png', 2, 1, sizex, sizey, -1)
-        self.ptera_height = [height * 0.82, height * 0.75, height * 0.60]
-        self.rect.centery = self.ptera_height[random.randrange(0, 3)]
-        self.rect.left = width + self.rect.width
-        self.image = self.images[0]
-        self.movement = [-1 * speed, 0]
-        self.index = 0
-        self.counter = 0
-        gc.birds.append(self)
-
-    def draw(self):
-        screen.blit(self.image, self.rect)
-
-    def update(self):
-        if self.counter % 10 == 0:
-            self.index = (self.index + 1) % 2
-        self.image = self.images[self.index]
-        self.rect = self.rect.move(self.movement)
-
-        # gc.bird_x = self.rect.x
-        # gc.bird_y = self.rect.y
-
-        #gc.birds.append(self)
-
-        self.counter = (self.counter + 1)
-        if self.rect.right < 0:
-            self.kill()
-
-    def getX(self):
-        return self.rect.x
-
-    def getY(self):
-        return self.rect.y
-
-
-class Ground():
-    def __init__(self, speed=-5):
-        self.image, self.rect = load_image('ground.png', -1, -1, -1)
-        self.image1, self.rect1 = load_image('ground.png', -1, -1, -1)
-        self.rect.bottom = height
-        self.rect1.bottom = height
-        self.rect1.left = self.rect.right
-        self.speed = speed
-
-    def draw(self):
-        screen.blit(self.image, self.rect)
-        screen.blit(self.image1, self.rect1)
-
-    def update(self):
-        self.rect.left += self.speed
-        self.rect1.left += self.speed
-
-        if self.rect.right < 0:
-            self.rect.left = self.rect1.right
-
-        if self.rect1.right < 0:
-            self.rect1.left = self.rect.right
-
-
-class Cloud(pygame.sprite.Sprite):
-    def __init__(self, x, y):
-        pygame.sprite.Sprite.__init__(self, self.containers)
-        self.image, self.rect = load_image('cloud.png', int(90 * 30 / 42), 30, -1)
-        self.speed = 1
-        self.rect.left = x
-        self.rect.top = y
-        self.movement = [-1 * self.speed, 0]
-
-    def draw(self):
-        screen.blit(self.image, self.rect)
-
-    def update(self):
-        self.rect = self.rect.move(self.movement)
-        if self.rect.right < 0:
-            self.kill()
-
-
-class Scoreboard():
-    def __init__(self, x=-1, y=-1):
-        self.score = 0
-        self.tempimages, self.temprect = load_sprite_sheet('numbers.png', 12, 1, 11, int(11 * 6 / 5), -1)
-        self.image = pygame.Surface((55, int(11 * 6 / 5)))
-        self.rect = self.image.get_rect()
-        if x == -1:
-            self.rect.left = width * 0.89
-        else:
-            self.rect.left = x
-        if y == -1:
-            self.rect.top = height * 0.1
-        else:
-            self.rect.top = y
-
-    def draw(self):
-        screen.blit(self.image, self.rect)
-
-    def update(self, score):
-        score_digits = extractDigits(score)
-        self.image.fill(background_col)
-        for s in score_digits:
-            self.image.blit(self.tempimages[s], self.temprect)
-            self.temprect.left += self.temprect.width
-        self.temprect.left = 0
-
-
-def introscreen():
-    temp_dino = Dino(44, 47)
-    temp_dino.isBlinking = True
-    gameStart = False
-
-    callout, callout_rect = load_image('call_out.png', 196, 45, -1)
-    callout_rect.left = width * 0.05
-    callout_rect.top = height * 0.4
-
-    temp_ground, temp_ground_rect = load_sprite_sheet('ground.png', 15, 1, -1, -1, -1)
-    temp_ground_rect.left = width / 20
-    temp_ground_rect.bottom = height
-
-    logo, logo_rect = load_image('logo.png', 240, 40, -1)
-    logo_rect.centerx = width * 0.6
-    logo_rect.centery = height * 0.6
-    while not gameStart:
-        if pygame.display.get_surface() == None:
-            print("Couldn't load display surface")
-            return True
-        else:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    return True
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE or event.key == pygame.K_UP:
-                        temp_dino.isJumping = True
-                        temp_dino.isBlinking = False
-                        temp_dino.movement[1] = -1 * temp_dino.jumpSpeed
-
-        temp_dino.update()
-
-        if pygame.display.get_surface() != None:
-            screen.fill(background_col)
-            screen.blit(temp_ground[0], temp_ground_rect)
-            if temp_dino.isBlinking:
-                screen.blit(logo, logo_rect)
-                screen.blit(callout, callout_rect)
-            temp_dino.draw()
-
-            pygame.display.update()
-
-        clock.tick(FPS)
-        if temp_dino.isJumping == False and temp_dino.isBlinking == False:
-            gameStart = True
-
-
-def gameplay():
-    global high_score
-    gamespeed = 4
-    startMenu = False
-    gameOver = False
-    gc.hasGameEnded = gameOver
-    gameQuit = False
-    playerDino = Dino(44, 47)
-    new_ground = Ground(-1 * gamespeed)
-    scb = Scoreboard()
-    highsc = Scoreboard(width * 0.78)
-    counter = 0
-
-    cacti = pygame.sprite.Group()
-    pteras = pygame.sprite.Group()
-    clouds = pygame.sprite.Group()
-    last_obstacle = pygame.sprite.Group()
-
-    Cactus.containers = cacti
-    Ptera.containers = pteras
-    Cloud.containers = clouds
-
-    retbutton_image, retbutton_rect = load_image('replay_button.png', 35, 31, -1)
-    gameover_image, gameover_rect = load_image('game_over.png', 190, 11, -1)
-
-    temp_images, temp_rect = load_sprite_sheet('numbers.png', 12, 1, 11, int(11 * 6 / 5), -1)
-    HI_image = pygame.Surface((22, int(11 * 6 / 5)))
-    HI_rect = HI_image.get_rect()
-    HI_image.fill(background_col)
-    HI_image.blit(temp_images[10], temp_rect)
-    temp_rect.left += temp_rect.width
-    HI_image.blit(temp_images[11], temp_rect)
-    HI_rect.top = height * 0.1
-    HI_rect.left = width * 0.73
-
-    while not gameQuit:
-
-        while startMenu:
-            pass
-        while not gameOver:
-
-            # gc.print()
-
-            if pygame.display.get_surface() == None:
-                print("Couldn't load display surface")
-                gameQuit = True
-                gameOver = True
-                gc.hasGameEnded = gameOver
-            else:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        gameQuit = True
-                        gameOver = True
-                        gc.hasGameEnded = gameOver
-
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_SPACE:
-                            if playerDino.rect.bottom == int(0.98 * height):
-                                playerDino.isJumping = True
-                                if pygame.mixer.get_init() != None:
-                                    jump_sound.play()
-                                playerDino.movement[1] = -1 * playerDino.jumpSpeed
-
-                        if event.key == pygame.K_DOWN:
-                            if not (playerDino.isJumping and playerDino.isDead):
-                                playerDino.isDucking = True
-
-                    if event.type == pygame.KEYUP:
-                        if event.key == pygame.K_DOWN:
-                            playerDino.isDucking = False
-            for c in cacti:
-                c.movement[0] = -1 * gamespeed
-                if pygame.sprite.collide_mask(playerDino, c):
-                    playerDino.isDead = True
-                    if pygame.mixer.get_init() != None:
-                        die_sound.play()
-
-            for p in pteras:
-                p.movement[0] = -1 * gamespeed
-                if pygame.sprite.collide_mask(playerDino, p):
-                    playerDino.isDead = True
-                    if pygame.mixer.get_init() != None:
-                        die_sound.play()
-
-            if len(cacti) < 2:
-                if len(cacti) == 0:
-                    last_obstacle.empty()
-                    last_obstacle.add(Cactus(gamespeed, 40, 40))
-                else:
-                    for l in last_obstacle:
-                        if l.rect.right < width * 0.7 and random.randrange(0, 50) == 10:
-                            last_obstacle.empty()
-                            last_obstacle.add(Cactus(gamespeed, 40, 40))
-
-            if len(pteras) == 0 and random.randrange(0, 200) == 10 and counter > 500:
-                for l in last_obstacle:
-                    if l.rect.right < width * 0.8:
-                        last_obstacle.empty()
-                        last_obstacle.add(Ptera(gamespeed, 46, 40))
-
-            if len(clouds) < 5 and random.randrange(0, 300) == 10:
-                Cloud(width, random.randrange(height / 5, height / 2))
-
-            playerDino.update()
-            cacti.update()
-            pteras.update()
-            clouds.update()
-            new_ground.update()
-            scb.update(playerDino.score)
-            highsc.update(high_score)
-
-            if pygame.display.get_surface() != None:
-                screen.fill(background_col)
-                new_ground.draw()
-                clouds.draw(screen)
-                scb.draw()
-                if high_score != 0:
-                    highsc.draw()
-                    screen.blit(HI_image, HI_rect)
-                cacti.draw(screen)
-                pteras.draw(screen)
-                playerDino.draw()
-
-                pygame.display.update()
-            clock.tick(FPS)
-
-            if playerDino.isDead:
-                gameOver = True
-                gc.hasGameEnded = gameOver
-                if playerDino.score > high_score:
-                    high_score = playerDino.score
-
-            if counter % 700 == 699:
-                new_ground.speed -= 1
-                gamespeed += 1
-
-            counter = (counter + 1)
-
-        if gameQuit:
-            break
-
-        while gameOver:
-            if pygame.display.get_surface() == None:
-                print("Couldn't load display surface")
-                gameQuit = True
-                gameOver = False
-                gc.hasGameEnded = gameOver
-            else:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        gameQuit = True
-                        gameOver = False
-                        gc.hasGameEnded = gameOver
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_ESCAPE:
-                            gameQuit = True
-                            gameOver = False
-                            gc.hasGameEnded = gameOver
-                        if event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
-                            gameOver = False
-                            gc.hasGameEnded = gameOver
-                            gameplay()
-            highsc.update(high_score)
-            if pygame.display.get_surface() != None:
-                disp_gameOver_msg(retbutton_image, gameover_image)
-                if high_score != 0:
-                    highsc.draw()
-                    screen.blit(HI_image, HI_rect)
-                pygame.display.update()
-            clock.tick(FPS)
-
-    pygame.quit()
-    quit()
-
-
-def main():
-    isGameQuit = introscreen()
-    gc.hasGameEnded = isGameQuit
-    if not isGameQuit:
-        gameplay()
-
-
-def simulate_key_press(k):
-    pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=k))
-
-
-def simulate_key_release(k):
-    pygame.event.post(pygame.event.Event(pygame.KEYUP, {"key": k}))
-
-
-class Game:
-
-    def __init__(self):
-        global high_score
-        self.currentScore = 0
-        self.gamespeed = 4
-        self.startMenu = False
-        self.gameOver = False
-        gc.hasGameEnded = self.gameOver
-        self.gameQuit = False
-        self.playerDino = Dino(44, 47)
-        self.new_ground = Ground(-1 * self.gamespeed)
-        self.scb = Scoreboard()
-        self.highsc = Scoreboard(width * 0.78)
-        self.counter = 0
-
-        self.cacti = pygame.sprite.Group()
-        self.pteras = pygame.sprite.Group()
-        self.clouds = pygame.sprite.Group()
-        self.last_obstacle = pygame.sprite.Group()
-
-        Cactus.containers = self.cacti
-        Ptera.containers = self.pteras
-        Cloud.containers = self.clouds
-
-        self.retbutton_image, self.retbutton_rect = load_image('replay_button.png', 35, 31, -1)
-        self.gameover_image, self.gameover_rect = load_image('game_over.png', 190, 11, -1)
-
-        self.temp_images, self.temp_rect = load_sprite_sheet('numbers.png', 12, 1, 11, int(11 * 6 / 5), -1)
-        self.HI_image = pygame.Surface((22, int(11 * 6 / 5)))
-        self.HI_rect = self.HI_image.get_rect()
-        self.HI_image.fill(background_col)
-        self.HI_image.blit(self.temp_images[10], self.temp_rect)
-        self.temp_rect.left += self.temp_rect.width
-        self.HI_image.blit(self.temp_images[11], self.temp_rect)
-        self.HI_rect.top = height * 0.1
-        self.HI_rect.left = width * 0.73
-
-    def play(self, KEY_SPACE, KEY_DOWN, KEY_UP):
-        global high_score
-        # if not gameQuit:
-
-        # if startMenu:
-        # pass
-        # if not gameOver:
-        if True:
-            if True:
-                # gc.print()
-
-                if pygame.display.get_surface() == None:
-                    print("Couldn't load display surface")
-                    gameQuit = True
-                    gameOver = True
-                    gc.hasGameEnded = gameOver
-                else:
-
-                        """
-                        if event.type == pygame.QUIT:
-                            gameQuit = True
-                            gameOver = True
-                            gc.hasGameEnded = gameOver
-                        """
-
-                        if KEY_SPACE:
-                            if self.playerDino.rect.bottom == int(0.98 * height):
-                                self.playerDino.isJumping = True
-                                if pygame.mixer.get_init() != None:
-                                    pass
-                                    #jump_sound.play()
-                                self.playerDino.movement[1] = -1 * self.playerDino.jumpSpeed
-
-                        if KEY_DOWN:
-                            if not (self.playerDino.isJumping and self.playerDino.isDead):
-                                self.playerDino.isDucking = True
-
-                        if KEY_UP:
-                            self.playerDino.isDucking = False
-
-                for c in self.cacti:
-                    c.movement[0] = -1 * self.gamespeed
-                    if pygame.sprite.collide_mask(self.playerDino, c):
-                        self.playerDino.isDead = True
-                        if pygame.mixer.get_init() != None:
-                            # die_sound.play()
-                            pass
-
-                for p in self.pteras:
-                    p.movement[0] = -1 * self.gamespeed
-                    if pygame.sprite.collide_mask(self.playerDino, p):
-                        self.playerDino.isDead = True
-                        if pygame.mixer.get_init() != None:
-                            #die_sound.play()
-                            pass
-
-                if len(self.cacti) < 2:
-                    if len(self.cacti) == 0:
-                        self.last_obstacle.empty()
-                        self.last_obstacle.add(Cactus(self.gamespeed, 40, 40))
-                    else:
-                        for l in self.last_obstacle:
-                            if l.rect.right < width * 0.7 and random.randrange(0, 50) == 10:
-                                self.last_obstacle.empty()
-                                self.last_obstacle.add(Cactus(self.gamespeed, 40, 40))
-
-                if len(self.pteras) == 0 and random.randrange(0, 200) == 10 and self.counter > 500:
-                    for l in self.last_obstacle:
-                        if l.rect.right < width * 0.8:
-                            self.last_obstacle.empty()
-                            self.last_obstacle.add(Ptera(self.gamespeed, 46, 40))
-
-                if len(self.clouds) < 5 and random.randrange(0, 300) == 10:
-                    Cloud(width, random.randrange(height / 5, height / 2))
-
-                self.playerDino.update()
-                self.cacti.update()
-                self.pteras.update()
-                self.clouds.update()
-                self.new_ground.update()
-                self.scb.update(self.playerDino.score)
-                self.highsc.update(high_score)
-                self.currentScore = self.playerDino.score
-
-                if pygame.display.get_surface() != None:
-                    screen.fill(background_col)
-                    self.new_ground.draw()
-                    self.clouds.draw(screen)
-                    self.scb.draw()
-                    if high_score != 0:
-                        self.highsc.draw()
-                        screen.blit(self.HI_image, self.HI_rect)
-                    self.cacti.draw(screen)
-                    self.pteras.draw(screen)
-                    self.playerDino.draw()
-
-                    pygame.display.update()
-                    clock.tick(FPS)
-
-                    if self.playerDino.isDead:
-                        self.gameOver = True
-                        gc.hasGameEnded = self.gameOver
-                        if self.playerDino.score > high_score:
-                            high_score = self.playerDino.score
-
-                    """
-                    if self.counter % 700 == 699:
-                        self.new_ground.speed -= 1
-                        self.gamespeed += 1
-                    """
-
-                    self.counter = (self.counter + 1)
-
-
-"""
-game = Game()
-x = 1000
-while x > 0:
-    simulate_key_press(pygame.K_SPACE)
-    game.play()
-    print(game.gameOver)
-    time.wait(50)
-    x -= 1
-"""

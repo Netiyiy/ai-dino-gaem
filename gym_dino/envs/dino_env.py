@@ -18,6 +18,8 @@ class DinoEnv(gym.Env):
         print("Hi! I'm dino and I am running")
 
         self.world = game.Game()
+        #self.b = game.Game()
+        #self.b.play(False, False, False)
 
         self.size = size  # The size of the square grid
         self.window_size = 512  # The size of the PyGame window
@@ -55,16 +57,19 @@ class DinoEnv(gym.Env):
         self.clock = None
 
     def _get_obs(self):
-        return game.gc.getEnvironment()
+        obs = self.world.gc.getEnvironment()
+        #cactus_dist = obs.get("cactus")
+        #print(cactus_dist)
+        return obs
 
     def _get_info(self):
-        return {"score": game.gc.score}
+        return {"score": self.world.gc.score}
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
-        self.world = game.Game()
-        game.reset()
+        #self.world = game.Game()
+        self.world.reset()
         observation = self._get_obs()
         info = self._get_info()
 
@@ -121,11 +126,11 @@ class DinoEnv(gym.Env):
         # constant
 
         # self.world.currentScore
-        reward = 9 * game.gc.successfulJumps + 1
-        game.gc.successfulJumps = 0
-        terminated = game.gc.hasGameEnded
+        reward = 9 * self.world.gc.successfulJumps + 1
+        self.world.gc.successfulJumps = 0
+        terminated = self.world.gc.hasGameEnded
         if terminated:
-            reward = 0
+            reward = -10
         # reward = (1 + game.gc.successfulJumps) if terminated else -1  # Binary sparse rewards
         observation = self._get_obs()
         info = self._get_info()
@@ -133,6 +138,7 @@ class DinoEnv(gym.Env):
         if self.render_mode == "human":
             # self._render_frame()
             self.world.play(KEY_SPACE, KEY_DOWN, KEY_UP)
+            #self.b.play(KEY_SPACE, KEY_DOWN, KEY_UP)
 
         return observation, reward, terminated, False, info
 
