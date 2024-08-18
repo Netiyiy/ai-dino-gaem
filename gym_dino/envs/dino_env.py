@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 from stable_baselines3.common.callbacks import CheckpointCallback
 from gymnasium import spaces
 
+import wrapper_data
+
 
 class DinoEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
@@ -17,9 +19,10 @@ class DinoEnv(gym.Env):
 
         print("Hi! I'm dino and I am running")
 
-        self.world = game.Game()
-        #self.b = game.Game()
-        #self.b.play(False, False, False)
+        if game.PARENT is None:
+            game.PARENT = game.Game()
+
+        self.player = game.createPlayer()
 
         self.size = size  # The size of the square grid
         self.window_size = 512  # The size of the PyGame window
@@ -29,8 +32,10 @@ class DinoEnv(gym.Env):
         self.observation_space = spaces.Dict(
             {
                 "agent": spaces.Box(0, np.inf, shape=(2,), dtype=int),
-                "bird": spaces.Box(0, np.inf, shape=(1,), dtype=int),
-                "cactus": spaces.Box(0, np.inf, shape=(1,), dtype=int),
+                "nearest_cactus_dist": spaces.Box(-1, np.inf, shape=(1,), dtype=int),
+                "nearest_bird_dist": spaces.Box(-1, np.inf, shape=(1,), dtype=int),
+                "nearest_bird_Y": spaces.Box(-1, np.inf, shape=(1,), dtype=int),
+                "distance_between_obstacles": spaces.Box(-1, np.inf, shape=(1,), dtype=int),
             }
         )
 
@@ -57,25 +62,26 @@ class DinoEnv(gym.Env):
         self.clock = None
 
     def _get_obs(self):
-        obs = self.world.gc.getEnvironment()
+        obs = self.player.getObservations()
         #cactus_dist = obs.get("cactus")
         #print(cactus_dist)
         return obs
 
     def _get_info(self):
-        return {"score": self.world.gc.score}
+        return {"high_score": self.player.highestScore}
 
     def reset(self, seed=None, options=None):
-        # We need the following line to seed self.np_random
         super().reset(seed=seed)
-        #self.world = game.Game()
-        self.world.reset()
+        if game.PARENT is not None:
+            ended = game.PARENT.hasGameEnded
+            if ended:
+                game.PARENT.reset()
         observation = self._get_obs()
         info = self._get_info()
 
         if self.render_mode == "human":
             # self._render_frame()
-            self.world.play(False, False, False)
+            pass
 
         return observation, info
 
@@ -86,8 +92,6 @@ class DinoEnv(gym.Env):
         # Map the action (element of {0,1,2,3}) to the direction we walk in
         key = self._action_to_keyboard[action]
 
-        penalty = 0
-
         KEY_SPACE = False
         KEY_DOWN = False
         KEY_UP = False
@@ -96,17 +100,6 @@ class DinoEnv(gym.Env):
             KEY_SPACE = True
             if doPrint:
                 print("Jumped")
-
-            # reasonable = False
-            # for cactus in game.gc.cacti:
-            #    if cactus.getX() > game.gc.dino.getX():
-            # print(abs(cactus.getX() - game.gc.dino.getX()))
-            # if abs(cactus.getX() - game.gc.dino.getX()) < 200:
-            #    reasonable = True
-            #    penalty += -2
-            # if not reasonable:
-            # penalty += 2
-            # print(reasonable)
         elif key == "crouch":
             KEY_DOWN = True
             if doPrint:
@@ -115,30 +108,31 @@ class DinoEnv(gym.Env):
             KEY_UP = True
             if doPrint:
                 print("Uncrouched")
-            # penalty += 0.1
         elif key == "nothing":
             KEY_UP = True
-            # penalty += -0.5
-            # game.simulate_key_release(pygame.K_DOWN)
             if doPrint:
                 print("Nothing")
 
-        # constant
-
-        # self.world.currentScore
-        reward = 9 * self.world.gc.successfulJumps + 1
-        self.world.gc.successfulJumps = 0
-        terminated = self.world.gc.hasGameEnded
+        reward = 9 * self.player.successfulJumps + 1
+        self.player.successfulJumps = 0
+        terminated = self.player.getDino().isDead
         if terminated:
             reward = -10
         # reward = (1 + game.gc.successfulJumps) if terminated else -1  # Binary sparse rewards
         observation = self._get_obs()
         info = self._get_info()
 
+
+        self.player.sendActions(KEY_SPACE, KEY_DOWN, KEY_UP)
+
         if self.render_mode == "human":
-            # self._render_frame()
-            self.world.play(KEY_SPACE, KEY_DOWN, KEY_UP)
-            #self.b.play(KEY_SPACE, KEY_DOWN, KEY_UP)
+            if len(game.playerInstances) >= 1:
+                if game.playerInstances[-1] == self.player:
+                    game.PARENT.play()
+
+
+
+    # RESET THE ENVIRONMENT!!!!!
 
         return observation, reward, terminated, False, info
 
@@ -180,9 +174,11 @@ class DinoCheckpointCallback(CheckpointCallback):
         self.episode_rewards = []
         self.average_rewards = -1
         self.average_lengths = -1
+        self.name_prefix = name_prefix
 
     def _save_metrics(self):
 
+        """
         if self.average_rewards == -1 or self.average_lengths == -1:
             return
 
@@ -191,8 +187,39 @@ class DinoCheckpointCallback(CheckpointCallback):
         time_stamp = time.strftime("%Y%m%d%H%M%S")
 
         new_data = {
-            f'{time_stamp}-average_length': self.average_lengths,
-            f'{time_stamp}-average_reward': self.average_rewards
+            f'{self.name_prefix}-{time_stamp}-average_length': self.average_lengths,
+            f'{self.name_prefix}-{time_stamp}-average_reward': self.average_rewards
+        }
+
+        data = {}
+
+        if os.path.exists(json_path):
+            with open(json_path, 'r') as file:
+                try:
+                    data = json.load(file)
+                except json.JSONDecodeError:
+                    data = {}
+
+        data.update(new_data)
+
+        with open(json_path, 'w') as file:
+            json.dump(data, file, indent=4)
+
+        self.average_lengths = -1
+        self.average_rewards = -1
+        self.episode_lengths = []
+        self.episode_rewards = []
+
+        """
+
+        if self.average_rewards == -1 or self.average_lengths == -1:
+            return
+
+        json_path = os.path.join(self.save_path, 'shared_metrics.json')
+
+        new_data = {
+            f'{self.name_prefix}-average_length': self.average_lengths,
+            f'{self.name_prefix}-average_reward': self.average_rewards
         }
 
         data = {}
@@ -254,6 +281,8 @@ class DinoCheckpointCallback(CheckpointCallback):
             self.average_rewards = np.average(self.episode_rewards)
             self.average_lengths = np.average(self.episode_lengths)
         self._save_metrics()
+
+
 
     def _on_step(self) -> bool:
         if self.locals['dones']:

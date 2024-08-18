@@ -7,11 +7,6 @@ import game
 class Channel:
 
     def __init__(self, dino, birds, cacti, score, hasGameEnded):
-        self.dino = dino
-        self.birds = birds
-        self.cacti = cacti
-        self.score = score
-        self.hasGameEnded = False
         self.successfulJumps = 0
 
     def getEnvironment(self):
