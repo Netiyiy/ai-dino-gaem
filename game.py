@@ -86,19 +86,29 @@ class Player:
             return nearest_dist, distance_between_obstacles
 
         def process_nearest_bird(birds):
-            nearest_bird = None
+            nearest_b = None
             nearest_dist = 1000
             for b in list(birds):
-                if b.getX() < self.dino.getX():
+                if (b.getX() + 50) < self.dino.getX():
                     birds.remove(b)
-                    self.successfulJumps += 1
+                    if b.getY() != 70:
+                        self.successfulJumps += 1
                 else:
-                    dist = m.sqrt(
-                        m.pow(b.getX() - self.dino.getX(), 2) + m.pow(b.getY() - self.dino.getY(),
-                                                                             2))
+                    dist = abs(b.getX() - self.dino.getX())
+                    #dist = m.sqrt(m.pow(b.getX() - self.dino.getX(), 2) + m.pow(b.getY() - self.dino.getY(), 2))
                     if dist < nearest_dist:
-                        nearest_bird = b
-            return nearest_bird
+                        nearest_b = b
+
+                        # reward if crouched:
+                        if dist < 100:
+                            if nearest_b.getY() == 70:
+                                if self.dino.isDucking and not self.dino.isJumping:
+                                    self.successfulJumps += 10
+
+
+
+
+            return nearest_b
 
         global PARENT
         nearest_bird_y = -1
@@ -122,7 +132,6 @@ class Player:
             "nearest_bird_Y": np.array([nearest_bird_y], dtype=np.int64),
             "distance_between_obstacles": np.array([distance_between_obstacles], dtype=np.int64)
         }
-
     def sendActions(self, KEY_SPACE, KEY_DOWN, KEY_UP):
         self.KEY_SPACE = KEY_SPACE
         self.KEY_DOWN = KEY_DOWN
@@ -256,7 +265,7 @@ class Game:
                             self.last_obstacle.empty()
                             self.last_obstacle.add(Cactus(self, self.gameSpeed, 40, 40))
 
-            if len(self.pteras) == 0 and random.randrange(0, 200) == 10 and self.counter > 500:
+            if len(self.pteras) == 0 and random.randrange(0, 20) == 10: #and self.counter > 500: # (STOP 200)
                 for l in self.last_obstacle:
                     if l.rect.right < width * 0.8:
                         self.last_obstacle.empty()

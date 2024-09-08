@@ -63,7 +63,8 @@ class DinoEnv(gym.Env):
 
     def _get_obs(self):
         obs = self.player.getObservations()
-        #cactus_dist = obs.get("cactus")
+        #b_h = obs.get("nearest_bird_Y")
+        #print(b_h)
         #print(cactus_dist)
         return obs
 
@@ -114,14 +115,21 @@ class DinoEnv(gym.Env):
                 print("Nothing")
 
         reward = 9 * self.player.successfulJumps + 1
+        #tempJ = self.player.successfulJumps
         self.player.successfulJumps = 0
         terminated = self.player.getDino().isDead
         if terminated:
-            reward = -10
+            reward = -1000
         # reward = (1 + game.gc.successfulJumps) if terminated else -1  # Binary sparse rewards
         observation = self._get_obs()
         info = self._get_info()
 
+        """
+        e = observation.get("nearest_bird_Y")
+        if e != -1:
+            print("Observation: " + str(observation.get("nearest_bird_Y")) + " , Reward: " + str(reward))
+            print(tempJ)
+        """
 
         self.player.sendActions(KEY_SPACE, KEY_DOWN, KEY_UP)
 

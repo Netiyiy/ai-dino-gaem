@@ -1,16 +1,6 @@
 {
-    "ppo_dino16-average_length": 1118.0,
-    "ppo_dino16-average_reward": 1188.0,
-    "ppo_dino20-average_length": 662.0,
-    "ppo_dino20-average_reward": 702.0,
-    "ppo_dino19-average_length": 1103.0,
-    "ppo_dino19-average_reward": 1182.0,
-    "ppo_dino17-average_length": 729.0,
-    "ppo_dino17-average_reward": 766.0,
-    "ppo_dino15-average_length": 202.9,
-    "ppo_dino15-average_reward": 201.8,
-    "ppo_dino18-average_length": 1035.6666666666667,
-    "ppo_dino18-average_reward": 1102.6666666666667,
-    "ppo_dino_highestSaved-average_length": 515.0,
-    "ppo_dino_highestSaved-average_reward": 540.0
+    "ppo_dino15-average_length": 677.75,
+    "ppo_dino15-average_reward": 2552.25,
+    "ppo_dino18-average_length": 974.0,
+    "ppo_dino18-average_reward": 816.0
 }

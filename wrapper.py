@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import torch
 
 import pygame
 import stable_baselines3.common.monitor
@@ -10,7 +11,7 @@ import game
 import gym_dino
 import random
 import gymnasium as gym
-from multiprocessing import Process, Manager
+from multiprocessing import Process, Manager, Lock
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 
@@ -79,13 +80,13 @@ def testModel(model_name):
 
 
 def saveMetrics(currentHighest):
-
     json_path = os.path.join('./checkpoints/', 'metrics.json')
 
-    time_stamp = time.strftime("%Y%m%d%H%M%S")
+    time_stamp = time.strftime("%Y%m%d%H%M")
 
+    new_key = f'{time_stamp}-average_length'
     new_data = {
-        f'{time_stamp}-average_length': currentHighest
+        new_key: currentHighest
     }
 
     data = {}
@@ -96,6 +97,10 @@ def saveMetrics(currentHighest):
                 data = json.load(file)
             except json.JSONDecodeError:
                 data = {}
+
+    if new_key in data:
+        print(f"Data with timestamp {time_stamp} already exists. No update made.")
+        return
 
     data.update(new_data)
 
@@ -108,111 +113,169 @@ def reload_shared_metrics():
     json_path = os.path.join('./checkpoints/', 'shared_metrics.json')
 
     data = {
-        "ppo_dino19-average_length": 0,
-        "ppo_dino19-average_reward": 0,
-        "ppo_dino16-average_length": 64,
-        "ppo_dino16-average_reward": 64,
-        "ppo_dino20-average_length": 0,
-        "ppo_dino20-average_reward": 0,
-        "ppo_dino18-average_length": 0,
-        "ppo_dino18-average_reward": 0,
+        "ppo_dino15-average_length": 16,
+        "ppo_dino15-average_reward": 16,
+        "ppo_dino16-average_length": 0,
+        "ppo_dino16-average_reward": 0,
         "ppo_dino17-average_length": 0,
         "ppo_dino17-average_reward": 0,
-        "ppo_dino15-average_length": 0,
-        "ppo_dino15-average_reward": 0,
+        "ppo_dino18-average_length": 0,
+        "ppo_dino18-average_reward": 0,
+        "latest_highest_length": 1,
     }
 
     with open(json_path, 'w') as file:
         json.dump(data, file, indent=4)
 
+
+def set_shared_metrics_highest(new_length):
+
+    json_path = os.path.join('./checkpoints/', 'shared_metrics.json')
+
+    with open(json_path, 'r') as file:
+        data = json.load(file)
+
+        # Step 2: Update or add the `latest_highest_length` field
+    data['latest_highest_length'] = new_length
+
+    # Step 3: Write the updated data back to the file
+    with open(json_path, 'w') as file:
+        json.dump(data, file, indent=4)
+
+
 ### EVOLUTION PLAN ###
+model_names = [
+    "ppo_dino15",
+    "ppo_dino16",
+    "ppo_dino17",
+    "ppo_dino18",
+]
+#["ppo_dino15", "ppo_dino16", "ppo_dino17", "ppo_dino18", "ppo_dino19", "ppo_dino20"]
+
 
 def createSpecies():
     createNewModel("ppo_dino15")
     createNewModel("ppo_dino16")
     createNewModel("ppo_dino17")
     createNewModel("ppo_dino18")
-    createNewModel("ppo_dino19")
-    createNewModel("ppo_dino20")
+
+"""
+def createSpecies(n):
+    for x in range(15, n + 15):
+        createNewModel("ppo_dino"+x)
+"""
 
 
-def addEvolution(chosen_model, model_name):
-    checkpoint_callback = DinoCheckpointCallback(save_freq=int(1e10), save_path='./checkpoints/', name_prefix=model_name)
+def addEvolution(model_name, finishes, lock):
+    def modelsFinished():
+        for finished in finishes.values():
+            if not finished:
+                return False
+        return True
 
-    model = PPO.load(chosen_model, env)
+    # Initialize Model
+    checkpoint_callback = DinoCheckpointCallback(save_freq=int(1e10), save_path='./checkpoints/',
+                                                 name_prefix=model_name)
 
-    model.learn(total_timesteps=10_000, callback=checkpoint_callback)
-
-    model.save(model_name)
-
-def graphData():
-    pass
-
-def main():
-
-    latestHighestScore = 1
-
-    processes = []
+    model = PPO.load(model_name, env)
 
     while True:
 
-        model_names = ["ppo_dino15", "ppo_dino16", "ppo_dino17", "ppo_dino18", "ppo_dino19", "ppo_dino20"]
+        # Train Model
+        model.learn(total_timesteps=10_000, callback=checkpoint_callback)
 
-        values = {}
+        # Finish
+        torch.save(model.policy.state_dict(), f'{model_name}_policy.pth')
+        print(model_name + " has saved")
 
-        with open('checkpoints/shared_metrics.json', 'r') as file:
-            data = json.load(file)
+        time.sleep(1)
 
-        def get_average_length(m):
-            key = f"{m}-average_length"
-            return data.get(key, "Model not found")
+        with lock:
+            print(model_name + " has finished")
+            finishes[model_name] = True
 
-        for model_name in model_names:
-            values[model_name] = get_average_length(model_name)
+        while not modelsFinished():
+            pass
+
+        # Evolve Model
+        best_model_name = getBestModel()
+        model.policy.load_state_dict(torch.load(f'{best_model_name}_policy.pth'))
+
+        print(model_name + " evolved into " + best_model_name)
+
+        model.save(model_name)
+
+
+def getBestModel():
+
+    values = {}
+
+    with open('checkpoints/shared_metrics.json', 'r') as file:
+        data = json.load(file)
+
+    def get_average_length(m):
+        key = f"{m}-average_length"
+        return data.get(key, "Model not found")
+
+    def get_latest_highest_length():
+        key = "latest_highest_length"
+        return data.get(key, "Length not found")
+
+    for model_name in model_names:
+        values[model_name] = get_average_length(model_name)
 
         # use random model for now
-        chosen_model = model_names[-1]
+    chosen_model = model_names[-1]
 
-        try:
-            chosen_model = max(values, key=values.get)
-        except TypeError as e:
-            reload_shared_metrics()
+    try:
+        chosen_model = max(values, key=values.get)
+    except TypeError as e:
+        reload_shared_metrics()
 
-        saveMetrics(values[chosen_model])
+    saveMetrics(values[chosen_model])
 
-
+    try:
         # make sure that the model is safe to use (20%)
-        if ((latestHighestScore-values[chosen_model])/latestHighestScore) > 0.5:
+        latestHighestLength = get_latest_highest_length()
+        if ((latestHighestLength - values[chosen_model]) / latestHighestLength) > 0.5:
             # not safe to use, use latest save
             chosen_model = "ppo_dino_highestSaved"
         else:
-            latestHighestScore = values[chosen_model]
+            set_shared_metrics_highest(values[chosen_model])
             model = PPO.load(chosen_model, env)
             model.save("ppo_dino_highestSaved")
+            torch.save(model.policy.state_dict(), f'ppo_dino_highestSaved_policy.pth')
+    except TypeError as e:
+        reload_shared_metrics()
 
-        print("Chosen model is " + chosen_model)
+    return chosen_model
 
-        for model_name in model_names:
-            p = Process(target=addEvolution,
-                        args=(chosen_model, model_name))
-            processes.append(p)
-            p.start()
 
-        for p in processes:
-            p.join()
+def main():
 
+    manager = Manager()
+    finishes = manager.dict()
+    lock = Lock()
+
+    processes = []
+
+    for model_name in model_names:
+        p = Process(target=addEvolution,
+                    args=(model_name, finishes, lock))
+        processes.append(p)
+        p.start()
+
+    for p in processes:
+        p.join()
 
 if __name__ == '__main__':
     main()
 
-"""
-    model.policy = d["test"]
-    model = PPO.load(chosen_model, env)
-    d["test"] = model.policy
-    manager = Manager()
-    d = manager.dict()
-"""
+#model = PPO.load("ppo_dino_highestSaved", env)
+#model.save("ppo_dino_checkpoint")
+#showData("ppo_dino16")
 # Can't load and save models too many times
+# Can't remember long enough to make it to birds -> Make AI remember longer
 
 env.close()
 
